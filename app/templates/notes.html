@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Notes | SmartStudy{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto">
+  <h1 class="text-2xl font-bold mb-4">Your Notes</h1>
+
+  <!-- Forms row -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- Manual note -->
+    <div class="bg-gray-800 rounded-xl shadow p-4">
+      <h2 class="font-semibold mb-2">Add Note (Text)</h2>
+      <form id="note-text-form" class="space-y-3">
+        <input name="title" type="text" placeholder="Title"
+               class="w-full text-gray-800 border rounded p-2" required>
+        <textarea name="content" rows="6" placeholder="Write your note..."
+                  class="w-full text-gray-800 border rounded p-2" required></textarea>
+        <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          Save Note
+        </button>
+        <p id="text-form-msg" class="text-sm mt-2"></p>
+      </form>
+    </div>
+
+    <!-- PDF upload -->
+    <div class="bg-gray-800 rounded-xl shadow p-4">
+      <h2 class="font-semibold mb-2">Import from PDF / Text file</h2>
+      <form id="note-pdf-form" class="space-y-3" enctype="multipart/form-data">
+        <input name="title" type="text" placeholder="Title (optional)"
+               class="w-full text-gray-800 border rounded p-2">
+        <input name="file" type="file" accept=".pdf,.txt,.md"
+               class="w-full border rounded p-2" required>
+        <button class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+          Upload & Extract
+        </button>
+        <p id="pdf-form-msg" class="text-sm mt-2"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notes list -->
+  <div class="mt-8 bg-gray-800 rounded-xl shadow">
+    <div class="p-4 border-b">
+      <h2 class=" underline font-bold">SAVED NOTES</h2>
+    </div>
+    <div class="p-4 space-y-4">
+      {% if notes and notes|length > 0 %}
+        {% for n in notes %}
+          <a href="{{ url_for('routes.notes_view', note_id=n.id) }}"
+             class="block border rounded p-3 hover:bg-gray-600">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium">{{ n.title }}</p>
+                <p class="text-sm text-gray-400">{{ n.source_type|upper }} • {{ n.created_at }}</p>
+                <p class="text-sm text-gray-400 mt-1">{{ n.preview }}{% if n.preview and n.preview|length >= 200 %}…{% endif %}</p>
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      {% else %}
+        <p class="text-gray-500">No notes yet. Add one from the left.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/notes.js') }}"></script>
+{% endblock %}

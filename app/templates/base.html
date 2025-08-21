@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}SmartStudy{% endblock %}</title>
+  <script>
+    tailwind.config = {
+      darkMode: 'class', // enable dark mode
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1e3a8a', // custom blue
+            secondary: '#f97316', // custom orange
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body class="bg-gray-900 text-gray-100 flex flex-col min-h-screen">
+
+  <!-- Navbar -->
+  <nav class="bg-primary text-white px-6 py-3 flex justify-between items-center shadow-md">
+    <a href="/" class="font-bold text-lg">📘 SmartStudy</a>
+    <div class="space-x-4">
+      <a href="/notes" class="hover:text-gray-300">Notes</a>
+      <a href="/flashcards" class="hover:text-gray-300">Flashcards</a>
+      <a href="/quizzes" class="hover:text-gray-300">Quizzes</a>
+      <a href="/weak-topics" class="hover:text-gray-300">Weak Topics</a>
+      <a href="/" class="hover:underline">Auth Chat</a>
+      <a href="/dashboard" class="hover:underline">Dashboard</a>
+
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="flex-1 container mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-gray-300 text-center py-3">
+    <p>© 2025 SmartStudy. Built with ❤️ using Flask + Tailwind.</p>
+  </footer>
+
+</body>
+
+
+
+</html>
