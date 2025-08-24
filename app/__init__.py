@@ -1,8 +1,10 @@
-from flask import Flask
-from cs50 import SQL
 import os
+from cs50 import SQL
+from flask import Flask
+from dotenv import load_dotenv
 from werkzeug.exceptions import RequestEntityTooLarge
 
+load_dotenv()  # loads variables from .env into environment
 
 # Database object (will be initialized in create_app)
 db = None

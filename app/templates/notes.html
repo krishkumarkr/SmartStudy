@@ -11,10 +11,9 @@
     <div class="bg-gray-800 rounded-xl shadow p-4">
       <h2 class="font-semibold mb-2">Add Note (Text)</h2>
       <form id="note-text-form" class="space-y-3">
-        <input name="title" type="text" placeholder="Title"
-               class="w-full text-gray-800 border rounded p-2" required>
+        <input name="title" type="text" placeholder="Title" class="w-full text-gray-800 border rounded p-2" required>
         <textarea name="content" rows="6" placeholder="Write your note..."
-                  class="w-full text-gray-800 border rounded p-2" required></textarea>
+          class="w-full text-gray-800 border rounded p-2" required></textarea>
         <button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
           Save Note
         </button>
@@ -26,10 +25,8 @@
     <div class="bg-gray-800 rounded-xl shadow p-4">
       <h2 class="font-semibold mb-2">Import from PDF / Text file</h2>
       <form id="note-pdf-form" class="space-y-3" enctype="multipart/form-data">
-        <input name="title" type="text" placeholder="Title (optional)"
-               class="w-full text-gray-800 border rounded p-2">
-        <input name="file" type="file" accept=".pdf,.txt,.md"
-               class="w-full border rounded p-2" required>
+        <input name="title" type="text" placeholder="Title (optional)" class="w-full text-gray-800 border rounded p-2">
+        <input name="file" type="file" accept=".pdf,.txt,.md" class="w-full border rounded p-2" required>
         <button class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
           Upload & Extract
         </button>
@@ -37,6 +34,22 @@
       </form>
     </div>
   </div>
+  
+<!-- Select a note -->
+<label for="note-select">Choose a note:</label>
+<p id="deepseek-msg" class="mt-2 text-sm text-gray-300"></p>
+<select id="note-select" class="w-full bg-gray-700 border rounded-lg p-2">
+    <option value="">-- choose a note --</option>
+    {% for n in notes %}
+        <option value="{{ n.id }}">{{ n.title }}</option>
+    {% endfor %}
+</select>
+
+<!-- DeepSeek button -->
+<button id="deepseek-btn" class="px-4 py-2 mt-2 bg-purple-600 text-white rounded-lg">
+  Process with DeepSeek
+</button>
+
 
   <!-- Notes list -->
   <div class="mt-8 bg-gray-800 rounded-xl shadow">
@@ -45,20 +58,20 @@
     </div>
     <div class="p-4 space-y-4">
       {% if notes and notes|length > 0 %}
-        {% for n in notes %}
-          <a href="{{ url_for('routes.notes_view', note_id=n.id) }}"
-             class="block border rounded p-3 hover:bg-gray-600">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="font-medium">{{ n.title }}</p>
-                <p class="text-sm text-gray-400">{{ n.source_type|upper }} • {{ n.created_at }}</p>
-                <p class="text-sm text-gray-400 mt-1">{{ n.preview }}{% if n.preview and n.preview|length >= 200 %}…{% endif %}</p>
-              </div>
-            </div>
-          </a>
-        {% endfor %}
+      {% for n in notes %}
+      <a href="{{ url_for('routes.notes_view', note_id=n.id) }}" class="block border rounded p-3 hover:bg-gray-600">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-medium">{{ n.title }}</p>
+            <p class="text-sm text-gray-400">{{ n.source_type|upper }} • {{ n.created_at }}</p>
+            <p class="text-sm text-gray-400 mt-1">{{ n.preview }}{% if n.preview and n.preview|length >= 200 %}…{% endif
+              %}</p>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
       {% else %}
-        <p class="text-gray-500">No notes yet. Add one from the left.</p>
+      <p class="text-gray-500">No notes yet. Add one from the left.</p>
       {% endif %}
     </div>
   </div>

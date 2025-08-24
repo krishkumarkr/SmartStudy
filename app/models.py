@@ -1,3 +1,4 @@
+import json
 from . import db
 
 def init_db():
@@ -24,7 +25,7 @@ def init_db():
             source_type TEXT CHECK(source_type IN ('manual','pdf')) NOT NULL DEFAULT 'manual',
             filename TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     """)
 
@@ -36,8 +37,8 @@ def init_db():
             question TEXT NOT NULL,
             answer TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (note_id) REFERENCES notes(id)
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     """)
 
@@ -45,9 +46,11 @@ def init_db():
         CREATE TABLE IF NOT EXISTS quizzes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
+            note_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
         )
     """)
 
@@ -59,7 +62,7 @@ def init_db():
             correct_answer TEXT NOT NULL,
             user_answer TEXT,
             is_correct BOOLEAN,
-            FOREIGN KEY (quiz_id) REFERENCES quizzes(id)
+            FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
         )
     """)
 
@@ -67,9 +70,11 @@ def init_db():
         CREATE TABLE IF NOT EXISTS weak_topics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
+            note_id INTEGER NOT NULL,
             topic TEXT NOT NULL,
             strength_score INTEGER DEFAULT 0,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
         )
     """)
 
@@ -124,24 +129,43 @@ def delete_flashcards_for_note(user_id, note_id):
 
 
 # ---------------- QUIZZES HELPERS ----------------
-def create_quiz(user_id, title):
-    return db.execute(
-        "INSERT INTO quizzes (user_id, title) VALUES (?, ?)", user_id, title
+
+def add_quiz(user_id, note_id, title):
+    db.execute(
+        "INSERT INTO quizzes (user_id, note_id, title) VALUES (?, ?, ?)",
+        user_id, note_id, title
     )
+    row = db.execute("SELECT last_insert_rowid() AS id")
+    return row[0]["id"]
 
 def add_quiz_question(quiz_id, question, correct_answer):
-    return db.execute(
+    db.execute(
         "INSERT INTO quiz_questions (quiz_id, question, correct_answer) VALUES (?, ?, ?)",
         quiz_id, question, correct_answer
+    )
+    row = db.execute("SELECT last_insert_rowid() AS id")
+    return row[0]["id"]
+
+
+def delete_quiz_for_note(user_id, note_id):
+    db.execute("DELETE FROM quizzes WHERE user_id=? AND note_id=?", user_id, note_id)
+
+def get_quizzes_for_note(user_id, note_id):
+    return db.execute(
+        "SELECT * FROM quizzes WHERE user_id=? AND note_id=? ORDER BY created_at DESC",
+        user_id, note_id
     )
 
 
 # ---------------- WEAK TOPICS HELPERS ----------------
-def add_weak_topic(user_id, topic, strength_score=0):
+def add_weak_topic(user_id, note_id, topic, strength_score=0):
     return db.execute(
-        "INSERT INTO weak_topics (user_id, topic, strength_score) VALUES (?, ?, ?)",
-        user_id, topic, strength_score
+        "INSERT INTO weak_topics (user_id, note_id, topic, strength_score) VALUES (?, ?, ?, ?)",
+        user_id, note_id, topic, strength_score
     )
 
 def get_weak_topics(user_id):
     return db.execute("SELECT * FROM weak_topics WHERE user_id = ?", user_id)
+
+def delete_weak_topics_for_note(user_id, note_id):
+    db.execute("DELETE FROM weak_topics WHERE user_id = ? AND note_id = ?", user_id, note_id)

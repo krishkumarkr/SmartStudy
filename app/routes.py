@@ -5,11 +5,13 @@ from . import db
 from PyPDF2 import PdfReader
 from .utils import login_required
 from werkzeug.utils import secure_filename
+from .deepseek import deepseek_process_text
 from .utils_ai import simple_flashcards_from_text
 from pdfplumber.utils.exceptions import PdfminerException
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, current_app
-from .models import create_user, get_user_by_email, add_note, get_note, get_notes_by_user, add_flashcard, delete_flashcards_for_note, get_flashcards_by_note
+from .models import create_user, get_user_by_email, add_note, get_note, get_notes_by_user, add_flashcard, delete_flashcards_for_note, get_flashcards_by_note, add_quiz, add_quiz_question, delete_quiz_for_note, delete_weak_topics_for_note, add_weak_topic
+
 
 bp = Blueprint("routes", __name__)
 
@@ -319,11 +321,148 @@ def generate_flashcards():
     delete_flashcards_for_note(session["user_id"], note_id)
 
     # Generate
-    pairs = simple_flashcards_from_text(note["content"], max_cards=count)
-    if not pairs:
+    result = deepseek_process_text(note["content"], max_items=count)
+    if not result or "flashcards" not in result:
         return jsonify({"ok": False, "msg": "Could not generate flashcards from this note."}), 400
 
-    for p in pairs:
-        add_flashcard(session["user_id"], note_id, p["question"], p["answer"])
+    for f in result["flashcards"]:
+        add_flashcard(session["user_id"], note_id, f["question"], f["answer"])
 
-    return jsonify({"ok": True, "msg": f"Generated {len(pairs)} flashcards.", "cards": pairs})
+    return jsonify({"ok": True, "msg": f"Generated {len(result)} flashcards.", "cards": result["flashcards"]})
+
+# --------------------------------------------------------------------------------------------------------------
+# QUIZZES
+# --------------------------------------------------------------------------------------------------------------
+
+@bp.route("/quizzes")
+@login_required
+def quizzes_dashboard():
+    # Fetch all notes for the current user
+    notes = db.execute("SELECT id, title FROM notes WHERE user_id = ?", session["user_id"])
+    return render_template("quizzes.html", notes=notes)
+
+# --------------------------------------------------------------------------------------------------------------
+# QUIZZES/GENERATE
+# --------------------------------------------------------------------------------------------------------------
+
+@bp.route("/quizzes/generate", methods=["POST"])
+@login_required
+def generate_quiz():
+    data = request.get_json(silent=True) or {}
+    note_id = data.get("note_id")
+
+    if not note_id:
+        return jsonify({"ok": False, "msg": "note_id required"}), 400
+
+    note = get_note(session["user_id"], note_id)
+    if not note:
+        return jsonify({"ok": False, "msg": "Note not found"}), 404
+
+    delete_quiz_for_note(session["user_id"], note_id)
+
+    result = deepseek_process_text(note["content"], max_items=5)
+    if not result or "quizzes" not in result:
+        return jsonify({"ok": False, "msg": "No quizzes generated"}), 400
+
+    quiz_id = add_quiz(session["user_id"], note_id, title=f"Quiz from {note['title']}")
+
+    for q in result["quizzes"]:
+        add_quiz_question(
+            quiz_id,
+            q["question"],
+            q["answer"],
+            # q.get("options", [])  # if DeepSeek returns options
+        )
+
+    return jsonify({"ok": True, "quiz": result["quizzes"], "quiz_id": quiz_id}) 
+
+
+
+# --------------------------------------------------------------------------------------------------------------
+# QUIZ SUBMISSION + WEAK TOPICS
+# --------------------------------------------------------------------------------------------------------------
+
+@bp.route("/quizzes/submit", methods=["POST"])
+@login_required
+def submit_quiz():
+    data = request.get_json(silent=True) or {}
+    quiz_id = data.get("quiz_id")
+    answers = data.get("answers", {})  # {question_id: user_answer}
+
+    if not quiz_id:
+        return jsonify({"ok": False, "msg": "quiz_id required"}), 400
+
+    questions = db.execute(
+        "SELECT id, question, answer, note_id FROM quiz_questions WHERE quiz_id = ?",
+        quiz_id,
+    )
+    if not questions:
+        return jsonify({"ok": False, "msg": "Quiz not found"}), 404
+
+    note_id = questions[0]["note_id"]
+    wrong_topics = []
+
+    for q in questions:
+        correct = str(q["answer"]).strip().lower()
+        user_ans = str(answers.get(str(q["id"]), "")).strip().lower()
+        if user_ans != correct:
+            wrong_topics.append(q["question"])
+
+    # Save weak topics
+    delete_weak_topics_for_note(session["user_id"], note_id)
+    for topic in wrong_topics:
+        add_weak_topic(session["user_id"], note_id, topic)
+
+    score = len(questions) - len(wrong_topics)
+
+    return jsonify({
+        "ok": True,
+        "score": score,
+        "total": len(questions),
+        "wrong_topics": wrong_topics
+    })
+
+
+
+@bp.route("/notes/process_deepseek", methods=["POST"])
+@login_required
+def notes_process_deepseek():
+    note_id = request.form.get("note_id", type=int)
+    if not note_id:
+        return jsonify({"ok": False, "msg": "note_id required"}), 400
+
+    note = get_note(session["user_id"], note_id)
+    if not note:
+        return jsonify({"ok": False, "msg": "Note not found"}), 404
+
+    if note["user_id"] != session["user_id"]:
+        return jsonify({"ok": False, "msg": "Unauthorized"}), 403
+
+
+    # Clear old flashcards / quizzes / weak topics
+    delete_flashcards_for_note(session["user_id"], note_id)
+    delete_quiz_for_note(session["user_id"], note_id)
+    delete_weak_topics_for_note(session["user_id"], note_id)
+
+    # Call DeepSeek API
+    data = deepseek_process_text(note["content"], max_items=10)
+    if not data:
+        return jsonify({"ok": False, "msg": "DeepSeek API failed."}), 500
+
+
+    # Store flashcards
+    for f in data.get("flashcards", []):
+        add_flashcard(session["user_id"], note_id, f["question"], f["answer"])
+
+    # Store quizzes
+    if data.get("quizzes"):
+        quiz_id = add_quiz(session["user_id"], note_id, title=f"Quiz from {note['title']}")
+        quiz_data = []
+        for q in data.get("quizzes", []):
+            add_quiz_question(quiz_id, q["question"], q["answer"]) 
+
+    # Store weak topics
+    for topic in data.get("weak_topics", []):
+        add_weak_topic(session["user_id"], note_id, topic)
+
+    return jsonify({"ok": True, "msg": "Processed note with DeepSeek.", "data": data})
